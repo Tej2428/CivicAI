@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig, type Plugin } from 'vite';
-import { handleApiRequests } from './server/apiHandler';
+import { handleApiRequests } from './server/apiHandler.ts';
 
 function civicApiPlugin(): Plugin {
   return {
@@ -24,7 +24,7 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss(), civicApiPlugin()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname || '.', '.'),
       },
     },
     server: {

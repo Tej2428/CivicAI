@@ -94,6 +94,11 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ onSelectReport }) => {
 
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapInstanceRef.current = map;
+
+      // Small delay to ensure proper rendering after container layout
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 100);
     }
 
     // Refresh markers
@@ -134,7 +139,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ onSelectReport }) => {
               <span style="color: #334155;">${rep.status}</span>
             </div>
             <div style="margin-top: 8px;">
-              <button id="btn-popup-${rep.id}" style="width: 100%; padding: 4px 8px; font-weight: 700; font-size: 11px; background: #0f172a; color: white; border-radius: 6px; border: none; cursor: pointer;">
+              <button id="btn-popup-${rep.id}" style="width: 100%; padding: 6px 8px; font-weight: 700; font-size: 11px; background: #0f172a; color: white; border-radius: 6px; border: none; cursor: pointer;">
                 Inspect Complaint
               </button>
             </div>
@@ -155,9 +160,25 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({ onSelectReport }) => {
     }
 
     return () => {
-      // Map cleanup if unmounted
+      // Clean up map when switching viewMode away from 'map' or unmounting
+      if (viewMode !== 'map' && mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markersLayerRef.current = null;
+      }
     };
   }, [viewMode, filteredReports, onSelectReport]);
+
+  // Complete cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markersLayerRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className="space-y-8 pb-12">

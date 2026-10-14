@@ -30,6 +30,14 @@ export function canUserTransitionStatus(
     };
   }
 
+  // Only Administrator can reopen closed tickets
+  if (currentStatus === 'Closed' && role !== 'admin') {
+    return {
+      allowed: false,
+      reason: 'Only Municipal Administrators have authority to reopen closed tickets.',
+    };
+  }
+
   const allowedTargets = VALID_TRANSITIONS[currentStatus] || [];
   if (!allowedTargets.includes(targetStatus)) {
     return {

@@ -23,6 +23,7 @@ import {
   Layers,
   ChevronRight,
   X,
+  Download,
 } from 'lucide-react';
 
 interface OfficerDashboardProps {
@@ -68,6 +69,17 @@ export const OfficerDashboard: React.FC<OfficerDashboardProps> = ({ onSelectRepo
   const [resolutionPhotoUrl, setResolutionPhotoUrl] = useState<string>('');
   const [actionError, setActionError] = useState<string>('');
   const [actionSuccess, setActionSuccess] = useState<string>('');
+
+  // Keyboard accessibility: Close drawer on Escape
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && activeReportId) {
+        setActiveReportId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeReportId]);
 
   const activeReport = useMemo(() => {
     if (!activeReportId) return null;
@@ -190,6 +202,50 @@ export const OfficerDashboard: React.FC<OfficerDashboardProps> = ({ onSelectRepo
     }
   };
 
+  const handleExportCsv = () => {
+    const headers = [
+      'Complaint ID',
+      'Category',
+      'Status',
+      'Priority Band',
+      'Priority Score',
+      'Safety Risk Score',
+      'Address',
+      'Neighborhood',
+      'Latitude',
+      'Longitude',
+      'Reporter',
+      'Created At',
+      'Assigned Team',
+    ];
+    const rows = filteredReports.map((r) => [
+      r.id,
+      `"${r.category.replace(/"/g, '""')}"`,
+      r.status,
+      r.priority.band,
+      r.priority.totalScore,
+      r.priority.factors.publicSafetyRisk.contribution,
+      `"${r.location.address.replace(/"/g, '""')}"`,
+      `"${(r.location.neighborhood || '').replace(/"/g, '""')}"`,
+      r.location.latitude ?? '',
+      r.location.longitude ?? '',
+      `"${r.reporterName.replace(/"/g, '""')}"`,
+      r.createdAt,
+      `"${(r.assignedTeam || 'Unassigned').replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `CivicAI_WorkOrders_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-8 pb-12">
       {/* Header */}
@@ -296,6 +352,15 @@ export const OfficerDashboard: React.FC<OfficerDashboardProps> = ({ onSelectRepo
               <ArrowUpDown className="w-3.5 h-3.5" />
               <span>Sort: {sortBy === 'priority' ? 'Priority Score' : 'Submission Date'}</span>
             </button>
+
+            <button
+              onClick={handleExportCsv}
+              className="px-3 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors border border-teal-200 cursor-pointer"
+              title="Download filtered complaint work orders as CSV"
+            >
+              <Download className="w-3.5 h-3.5 text-teal-700" />
+              <span>Export CSV</span>
+            </button>
           </div>
         </div>
       </div>
@@ -396,18 +461,24 @@ export const OfficerDashboard: React.FC<OfficerDashboardProps> = ({ onSelectRepo
 
       {/* Action Modal */}
       {activeReport && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="work-order-title"
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
                 <span className="font-mono text-xs font-bold text-teal-700 uppercase">Municipal Work Order</span>
-                <h3 className="text-base font-extrabold text-slate-900 mt-0.5">
+                <h3 id="work-order-title" className="text-base font-extrabold text-slate-900 mt-0.5">
                   {activeReport.id} — {activeReport.category}
                 </h3>
               </div>
               <button
                 onClick={() => setActiveReportId(null)}
-                className="text-slate-400 hover:text-slate-700"
+                aria-label="Close work order dialog"
+                className="text-slate-400 hover:text-slate-700 cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
               >
                 <X className="w-5 h-5" />
               </button>

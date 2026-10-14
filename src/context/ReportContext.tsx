@@ -15,6 +15,7 @@ import {
   loadNotifications,
   loadPriorityConfig,
   loadReports,
+  saveReports,
   markAllNotificationsAsRead,
   markNotificationAsRead,
   resetDemoData as resetStorageDemoData,
@@ -337,6 +338,7 @@ export const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         priority: recalculatedPriority,
       };
     });
+    saveReports(recalculated);
     setReports(recalculated);
 
     addAuditLog({

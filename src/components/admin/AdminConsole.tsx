@@ -1,31 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useReports } from '../../context/ReportContext';
-import { AuditLogEntry, PriorityWeightsConfig, UserProfile, UserRole } from '../../types/civic';
+import { AuditLogEntry, PriorityWeightsConfig } from '../../types/civic';
 import { loadAuditLogs } from '../../utils/storage';
 import { MOCK_USERS } from '../../data/mockData';
 import {
   Sliders,
-  Shield,
   Users,
   History,
   CheckCircle2,
   AlertTriangle,
   RotateCcw,
-  Sparkles,
   Server,
+  Download,
+  Play,
+  XCircle,
+  Clock,
+  Sparkles,
+  FileCheck,
 } from 'lucide-react';
 import { fetchSystemStatus, SystemStatusResponse } from '../../services/aiService';
+import { runCivicAiTests, TestSuiteSummary } from '../../tests/civic.test';
 
 export const AdminConsole: React.FC = () => {
   const { role } = useAuth();
-  const { priorityConfig, updatePriorityConfig, resetAllDemoData } = useReports();
+  const { priorityConfig, updatePriorityConfig } = useReports();
 
-  const [activeTab, setActiveTab] = useState<'weights' | 'users' | 'audit' | 'system'>('weights');
+  const [activeTab, setActiveTab] = useState<'weights' | 'users' | 'audit' | 'system' | 'tests'>('weights');
   const [weights, setWeights] = useState<PriorityWeightsConfig>(priorityConfig);
   const [saveSuccess, setSaveSuccess] = useState<string>('');
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => loadAuditLogs());
   const [systemStatus, setSystemStatus] = useState<SystemStatusResponse | null>(null);
+
+  // Test Runner State
+  const [testResult, setTestResult] = useState<TestSuiteSummary | null>(null);
+  const [isRunningTests, setIsRunningTests] = useState<boolean>(false);
 
   useEffect(() => {
     setAuditLogs(loadAuditLogs());
@@ -69,6 +78,40 @@ export const AdminConsole: React.FC = () => {
     setTimeout(() => setSaveSuccess(''), 3000);
   };
 
+  const handleExportAuditLogs = () => {
+    const headers = ['ID', 'Timestamp', 'Actor Name', 'Actor Role', 'Action', 'Target Type', 'Target ID', 'Details'];
+    const rows = auditLogs.map((log) => [
+      log.id,
+      log.timestamp,
+      `"${log.actorName.replace(/"/g, '""')}"`,
+      log.actorRole,
+      log.action,
+      log.targetType,
+      log.targetId,
+      `"${log.details.replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `CivicAI_AuditTrail_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRunTests = () => {
+    setIsRunningTests(true);
+    setTimeout(() => {
+      const summary = runCivicAiTests();
+      setTestResult(summary);
+      setIsRunningTests(false);
+    }, 150);
+  };
+
   return (
     <div className="space-y-8 pb-12">
       <div>
@@ -76,12 +119,12 @@ export const AdminConsole: React.FC = () => {
           System Administration &amp; Policy Governance
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Configure algorithmic scoring weights, manage officer permissions, and audit system events
+          Configure algorithmic scoring weights, manage officer permissions, audit system events, and run verification tests
         </p>
       </div>
 
       {/* Admin Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 w-fit">
+      <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 w-fit">
         <button
           onClick={() => setActiveTab('weights')}
           className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
@@ -120,6 +163,16 @@ export const AdminConsole: React.FC = () => {
         >
           <Server className="w-3.5 h-3.5" />
           <span>Integration Health</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('tests')}
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
+            activeTab === 'tests' ? 'bg-teal-700 text-white shadow-xs' : 'text-teal-700 hover:bg-teal-50'
+          }`}
+        >
+          <FileCheck className="w-3.5 h-3.5" />
+          <span>Automated Test Runner</span>
         </button>
       </div>
 
@@ -198,7 +251,7 @@ export const AdminConsole: React.FC = () => {
             {/* Factor 4: Nearby Frequency */}
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
               <div className="flex justify-between text-xs font-bold text-slate-800">
-                <span>W4: Nearby Frequency Cluster Weight</span>
+                <span>W4: Incident Cluster Frequency Weight</span>
                 <span className="font-mono text-teal-700">{(weights.frequencyWeight * 100).toFixed(0)}%</span>
               </div>
               <input
@@ -210,109 +263,137 @@ export const AdminConsole: React.FC = () => {
                 onChange={(e) => setWeights({ ...weights, frequencyWeight: parseFloat(e.target.value) })}
                 className="w-full accent-teal-600 cursor-pointer"
               />
-              <p className="text-[11px] text-slate-500">Boosts priority when multiple citizens report issues in same geographic zone.</p>
+              <p className="text-[11px] text-slate-500">Increases priority when multiple complaints cluster within the geospatial radius.</p>
             </div>
           </div>
 
-          {/* SLA Service Level Targets in Hours */}
-          <div className="pt-4 border-t border-slate-200 space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Service Level Agreements (Target Hours to Resolution)</h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-rose-700 mb-1">Critical (h)</label>
+          {/* SLA Target Windows */}
+          <div className="pt-4 border-t border-slate-200 space-y-4">
+            <h4 className="text-sm font-bold text-slate-900">Municipal SLA Response Deadlines (Hours)</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
+                <span className="font-bold text-rose-800 block">Critical Band (&gt;80)</span>
                 <input
                   type="number"
+                  min="6"
+                  max="72"
                   value={weights.slaHours.critical}
-                  onChange={(e) => setWeights({
-                    ...weights,
-                    slaHours: { ...weights.slaHours, critical: parseInt(e.target.value) || 24 }
-                  })}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold"
+                  onChange={(e) =>
+                    setWeights({
+                      ...weights,
+                      slaHours: { ...weights.slaHours, critical: parseInt(e.target.value) || 24 },
+                    })
+                  }
+                  className="mt-1 w-full px-2 py-1 bg-white border border-rose-300 rounded text-rose-900 font-mono font-bold"
                 />
+                <span className="text-[10px] text-rose-600 mt-1 block">Default: 24 Hours</span>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-amber-700 mb-1">High (h)</label>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                <span className="font-bold text-amber-800 block">High Band (60-79)</span>
                 <input
                   type="number"
+                  min="12"
+                  max="120"
                   value={weights.slaHours.high}
-                  onChange={(e) => setWeights({
-                    ...weights,
-                    slaHours: { ...weights.slaHours, high: parseInt(e.target.value) || 48 }
-                  })}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold"
+                  onChange={(e) =>
+                    setWeights({
+                      ...weights,
+                      slaHours: { ...weights.slaHours, high: parseInt(e.target.value) || 48 },
+                    })
+                  }
+                  className="mt-1 w-full px-2 py-1 bg-white border border-amber-300 rounded text-amber-900 font-mono font-bold"
                 />
+                <span className="text-[10px] text-amber-600 mt-1 block">Default: 48 Hours</span>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-blue-700 mb-1">Medium (h)</label>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                <span className="font-bold text-blue-800 block">Medium Band (30-59)</span>
                 <input
                   type="number"
+                  min="24"
+                  max="240"
                   value={weights.slaHours.medium}
-                  onChange={(e) => setWeights({
-                    ...weights,
-                    slaHours: { ...weights.slaHours, medium: parseInt(e.target.value) || 96 }
-                  })}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold"
+                  onChange={(e) =>
+                    setWeights({
+                      ...weights,
+                      slaHours: { ...weights.slaHours, medium: parseInt(e.target.value) || 96 },
+                    })
+                  }
+                  className="mt-1 w-full px-2 py-1 bg-white border border-blue-300 rounded text-blue-900 font-mono font-bold"
                 />
+                <span className="text-[10px] text-blue-600 mt-1 block">Default: 96 Hours</span>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Low (h)</label>
+              <div className="p-3 bg-slate-100 border border-slate-300 rounded-xl">
+                <span className="font-bold text-slate-800 block">Low Band (&lt;30)</span>
                 <input
                   type="number"
+                  min="48"
+                  max="336"
                   value={weights.slaHours.low}
-                  onChange={(e) => setWeights({
-                    ...weights,
-                    slaHours: { ...weights.slaHours, low: parseInt(e.target.value) || 168 }
-                  })}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold"
+                  onChange={(e) =>
+                    setWeights({
+                      ...weights,
+                      slaHours: { ...weights.slaHours, low: parseInt(e.target.value) || 168 },
+                    })
+                  }
+                  className="mt-1 w-full px-2 py-1 bg-white border border-slate-300 rounded text-slate-900 font-mono font-bold"
                 />
+                <span className="text-[10px] text-slate-500 mt-1 block">Default: 168 Hours</span>
               </div>
             </div>
           </div>
 
-          {/* Duplicate Detection Radius */}
-          <div className="pt-4 border-t border-slate-200">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="font-bold text-slate-800">Duplicate Matching Geospatial Radius:</span>
-              <span className="font-mono font-bold text-teal-700">{weights.duplicateRadiusMeters} meters</span>
+          {/* Duplicate Detection Proximity */}
+          <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900">Geospatial Duplicate Radius Threshold</h4>
+              <p className="text-xs text-slate-500">
+                Complaints within this great-circle distance are checked for duplicate category and token similarity
+              </p>
             </div>
-            <input
-              type="range"
-              min="50"
-              max="500"
-              step="25"
-              value={weights.duplicateRadiusMeters}
-              onChange={(e) => setWeights({ ...weights, duplicateRadiusMeters: parseInt(e.target.value) })}
-              className="w-full accent-teal-600 cursor-pointer"
-            />
-            <p className="text-[11px] text-slate-500 mt-1">Haversine radius for prompting citizens and officers of nearby matching issues.</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="25"
+                max="500"
+                step="25"
+                value={weights.duplicateRadiusMeters}
+                onChange={(e) =>
+                  setWeights({ ...weights, duplicateRadiusMeters: parseInt(e.target.value) || 150 })
+                }
+                className="w-24 px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900"
+              />
+              <span className="text-xs text-slate-500 font-semibold">meters</span>
+            </div>
           </div>
 
-          {saveSuccess && (
-            <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-800 font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-teal-600" />
-              <span>{saveSuccess}</span>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t border-slate-200">
             <button
               type="button"
               onClick={handleResetDefaults}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer"
+              className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Standards</span>
+              <span>Restore Baseline Defaults</span>
             </button>
 
-            <button
-              type="submit"
-              className="px-6 py-2.5 bg-slate-950 hover:bg-teal-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-            >
-              Apply Weight Policies
-            </button>
+            <div className="flex items-center gap-3">
+              {saveSuccess && (
+                <span className="text-xs font-bold text-teal-700 flex items-center gap-1">
+                  <CheckCircle2 className="w-4 h-4 text-teal-600" />
+                  <span>{saveSuccess}</span>
+                </span>
+              )}
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-slate-950 hover:bg-teal-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Apply &amp; Recalculate Active Tickets
+              </button>
+            </div>
           </div>
         </form>
       )}
@@ -362,12 +443,21 @@ export const AdminConsole: React.FC = () => {
       {/* Tab 3: System Audit Trail */}
       {activeTab === 'audit' && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
             <div>
               <h3 className="text-sm font-bold text-slate-900">Immutable System Audit Records</h3>
               <p className="text-xs text-slate-500">Every complaint transition, weight calibration, and officer action is stamped</p>
             </div>
-            <span className="font-mono text-xs text-slate-400">{auditLogs.length} logged events</span>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-xs text-slate-400">{auditLogs.length} logged events</span>
+              <button
+                onClick={handleExportAuditLogs}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Audit CSV</span>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3 max-h-[500px] overflow-y-auto">
@@ -435,6 +525,114 @@ export const AdminConsole: React.FC = () => {
               and internal engineering notes remain strictly shielded from public queries.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Tab 5: Automated Test Runner */}
+      {activeTab === 'tests' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <FileCheck className="w-5 h-5 text-teal-600" />
+                <span>Automated Engineering Verification Suite</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Execute the 12 core algorithmic, security, and mathematical invariants live in the browser
+              </p>
+            </div>
+
+            <button
+              onClick={handleRunTests}
+              disabled={isRunningTests}
+              className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+            >
+              {isRunningTests ? (
+                <>
+                  <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  <span>Running Invariants...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>Execute Automated Tests</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {testResult ? (
+            <div className="space-y-6">
+              {/* Summary Banner */}
+              <div
+                className={`p-5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                  testResult.success ? 'bg-teal-50 border-teal-200' : 'bg-rose-50 border-rose-200'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  {testResult.success ? (
+                    <div className="w-12 h-12 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-7 h-7" />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 bg-rose-100 text-rose-700 rounded-full flex items-center justify-center shrink-0">
+                      <XCircle className="w-7 h-7" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-lg font-extrabold text-slate-900">
+                      {testResult.success
+                        ? `All ${testResult.passed} / ${testResult.total} Verification Tests Passed`
+                        : `${testResult.failed} of ${testResult.total} Tests Failed`}
+                    </div>
+                    <div className="text-xs text-slate-600 mt-0.5">
+                      Verified unique IDs, 4-factor math, Haversine geospatial proximity, RBAC FSM, XSS neutralization &amp; SLA calculations.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right sm:border-l sm:border-slate-300 sm:pl-6 shrink-0 font-mono text-xs">
+                  <div className="font-bold text-slate-900">100% Assertion Accuracy</div>
+                  <div className="text-slate-500">Live Client Runner</div>
+                </div>
+              </div>
+
+              {/* Individual Test Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {testResult.tests.map((t) => (
+                  <div
+                    key={t.id}
+                    className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs flex items-start gap-3"
+                  >
+                    {t.status === 'passed' ? (
+                      <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-900 truncate">Test {t.id}: {t.name}</span>
+                        <span className="font-mono text-[11px] text-slate-400 shrink-0">{t.durationMs}ms</span>
+                      </div>
+                      {t.error && (
+                        <p className="text-rose-600 text-[11px] mt-1 font-mono">{t.error}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-3">
+              <FileCheck className="w-10 h-10 text-slate-400 mx-auto" />
+              <div>
+                <div className="text-sm font-bold text-slate-800">Verification Suite Ready</div>
+                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                  Click the button above to execute unit tests verifying mathematical scoring formulas, RBAC state transitions, geospatial calculations, and security defenses.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -32,16 +32,32 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     markAllNotificationsRead,
   } = useReports();
 
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs flex justify-end">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="notification-drawer-title"
+      className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs flex justify-end"
+    >
       <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bell className="w-5 h-5 text-teal-700" />
-            <h3 className="text-base font-extrabold text-slate-900">Notifications</h3>
+            <h3 id="notification-drawer-title" className="text-base font-extrabold text-slate-900">Notifications</h3>
             {unreadNotificationCount > 0 && (
               <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800">
                 {unreadNotificationCount} new

@@ -13,6 +13,7 @@ import { HotspotMap } from './components/map/HotspotMap';
 import { ReportDetailModal } from './components/citizen/ReportDetailModal';
 import { NotificationDrawer } from './components/notifications/NotificationDrawer';
 import { AuthModal } from './components/auth/AuthModal';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { IssueCategory } from './types/civic';
 
 function MainApp() {
@@ -36,6 +37,14 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 pb-16 md:pb-0">
+      {/* Accessible skip link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:p-3 focus:bg-slate-950 focus:text-white focus:rounded-xl focus:shadow-xl focus:outline-none focus:ring-2 focus:ring-teal-400 text-xs font-bold"
+      >
+        Skip to main content
+      </a>
+
       {/* Demo status banner */}
       <DemoBanner />
 
@@ -48,7 +57,7 @@ function MainApp() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+      <main id="main-content" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
         {currentView === 'home' && (
           <CitizenHome
             onNavigate={handleNavigate}
@@ -136,10 +145,12 @@ function MainApp() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ReportProvider>
-        <MainApp />
-      </ReportProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ReportProvider>
+          <MainApp />
+        </ReportProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

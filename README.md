@@ -220,18 +220,27 @@ npm install
 npm run dev
 ```
 
-### Automated Unit Test Suite
-CivicAI includes an automated test runner (`src/tests/civic.test.ts`) validating core domain logic:
+### Automated Unit Test & Invariant Verification Suite
+CivicAI includes a comprehensive 12-point automated test runner (`src/tests/civic.test.ts`) validating core domain logic, algorithms, security rules, and mathematical invariants:
 ```bash
 npm test
 ```
-**Test Coverage:**
-1. Unique non-sequential complaint ID generation (`CIVIC-YYYY-XXXXX`).
-2. Priority score formula calculations, dangerous condition review flags, and bands.
-3. Unresolved duration scaling and cluster frequency scoring.
-4. Haversine distance calculations and duplicate report matching.
-5. Role-based status transition restrictions (citizen vs. officer).
-6. Text token Jaccard similarity algorithms.
+**Test Coverage Matrix (12 Invariants):**
+1. **Unique Complaint ID Format & Uniqueness**: Validates `CIVIC-YYYY-XXXXX` format and entropy without ambiguous characters (0, O, 1, I).
+2. **4-Factor Priority Score Formula & Math Precision**: Validates $W_1\times\text{Sev} + W_2\times\text{Safety} + W_3\times\text{Dur} + W_4\times\text{Freq}$ with exact float weight sums.
+3. **Priority Banding Classification**: Validates threshold boundaries for Critical (≥80), High (60–79), Medium (30–59), and Low (<30).
+4. **Unresolved Duration Escalation & Ceiling**: Validates non-linear time decay capping at 100 after 168 hours (7 days).
+5. **Incident Cluster Frequency Scaling**: Validates logarithmic/stepped frequency curve capping at 100 with ≥5 reports.
+6. **Haversine Geographic Distance Metric**: Validates great-circle distance accuracy within sub-meter precision.
+7. **Geospatial Duplicate Complaint Detection**: Validates proximity radius filter (150m) and category/keyword matching.
+8. **Role-Based Access Control (RBAC) & Finite State Transitions**: Verifies citizens cannot update status, officers can move `Submitted` → `Under Review`, direct jumps to `Resolved` are blocked, and only Admins can reopen `Closed` tickets.
+9. **Geospatial Coordinate Boundary & Type Validation**: Tests boundary limits (-90 to +90 lat, -180 to +180 lng, NaN, undefined).
+10. **Security Input Sanitization**: Neutralizes `<script>`, `javascript:`, inline event handlers (`onerror=`), and HTML injection.
+11. **Text Token Jaccard Overlap**: Verifies similarity tokenization and keyword matching accuracy.
+12. **SLA Resolution Window Calculation**: Verifies remaining hours and automated overdue escalation.
+
+**Interactive In-Browser Test Runner:**
+Judges and evaluators can also navigate to **Admin & SLA → Automated Test Runner** tab in the live UI to execute the full test suite live with a single click, viewing execution durations and assertion passes.
 
 ### Production Build & Deployment
 ```bash

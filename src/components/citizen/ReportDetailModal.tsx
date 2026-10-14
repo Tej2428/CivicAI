@@ -37,13 +37,29 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
   // Check if citizen is viewing their own report
   const isOwner = currentUser.id === report.reporterId;
 
+  // Keyboard accessibility: Close on Escape key
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-report-id"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
+    >
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
         {/* Modal Header */}
         <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-base font-extrabold text-slate-900">{report.id}</span>
+            <span id="modal-report-id" className="font-mono text-base font-extrabold text-slate-900">{report.id}</span>
             <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${badge.bg} ${badge.text} border ${badge.border}`}>
               {report.status}
             </span>

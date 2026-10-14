@@ -37,11 +37,11 @@ export function calculateDurationScore(createdAtIso: string, resolvedAtIso?: str
  * 0 reports = 10, 1-2 reports = 35, 3-5 reports = 65, 6+ reports = 100.
  */
 export function calculateFrequencyScore(nearbyCount: number): number {
-  if (nearbyCount <= 0) return 10;
-  if (nearbyCount === 1) return 30;
-  if (nearbyCount === 2) return 50;
-  if (nearbyCount === 3) return 70;
-  if (nearbyCount <= 5) return 85;
+  if (nearbyCount <= 0) return 0;
+  if (nearbyCount === 1) return 25;
+  if (nearbyCount === 2) return 45;
+  if (nearbyCount === 3) return 65;
+  if (nearbyCount === 4) return 85;
   return 100;
 }
 
