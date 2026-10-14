@@ -1,0 +1,6 @@
+{
+  "name": "CivicAI",
+  "description": "AI-Powered Civic Issue Intelligence Platform — Smarter Cities, Faster Solutions. Citizen reporting, automated Gemini vision triage, explainable priority scoring, and municipal command dashboard.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

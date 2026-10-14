@@ -1,0 +1,135 @@
+{
+  "$schema": "https://firebase.google.com/schemas/firestore/blueprint.json",
+  "version": "1.0.0",
+  "collections": {
+    "users": {
+      "description": "User accounts and role metadata",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "name": { "type": "string", "required": true },
+        "email": { "type": "string", "required": true },
+        "role": { "type": "string", "enum": ["citizen", "officer", "admin"], "required": true },
+        "department": { "type": "string", "required": false },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "reports": {
+      "description": "Civic infrastructure issue reports",
+      "fields": {
+        "id": { "type": "string", "pattern": "^CIVIC-\\d{4}-[A-Z0-9]{5}$", "required": true },
+        "reporterId": { "type": "string", "required": true },
+        "reporterName": { "type": "string", "required": true },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Pothole or damaged road",
+            "Garbage accumulation",
+            "Blocked drainage or waterlogging",
+            "Damaged streetlight",
+            "Water leakage",
+            "Damaged sidewalk",
+            "Other civic infrastructure issue",
+            "Uncertain or unclassifiable"
+          ],
+          "required": true
+        },
+        "citizenDescription": { "type": "string", "required": true },
+        "photoUrl": { "type": "string", "required": true },
+        "location": {
+          "type": "map",
+          "fields": {
+            "address": { "type": "string", "required": true },
+            "landmark": { "type": "string", "required": false },
+            "latitude": { "type": "number", "required": false },
+            "longitude": { "type": "number", "required": false },
+            "neighborhood": { "type": "string", "required": false }
+          }
+        },
+        "priority": {
+          "type": "map",
+          "fields": {
+            "totalScore": { "type": "number", "min": 0, "max": 100 },
+            "band": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+            "requiresImmediateHumanReview": { "type": "boolean" },
+            "explanation": { "type": "string" },
+            "lastAssessedAt": { "type": "timestamp" }
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Submitted", "Under Review", "Assigned", "In Progress", "Resolved", "Closed"],
+          "required": true
+        },
+        "assignedTeam": { "type": "string", "required": false },
+        "assignedOfficerName": { "type": "string", "required": false },
+        "createdAt": { "type": "timestamp", "required": true },
+        "updatedAt": { "type": "timestamp", "required": true },
+        "duplicateOfId": { "type": "string", "required": false }
+      },
+      "subcollections": {
+        "internal_notes": {
+          "description": "Officer-only engineering and field inspection notes",
+          "fields": {
+            "id": { "type": "string", "required": true },
+            "authorName": { "type": "string", "required": true },
+            "note": { "type": "string", "required": true },
+            "timestamp": { "type": "timestamp", "required": true }
+          }
+        }
+      }
+    },
+    "audit_logs": {
+      "description": "Immutable audit trail of municipal actions",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "actorId": { "type": "string", "required": true },
+        "actorName": { "type": "string", "required": true },
+        "actorRole": { "type": "string", "required": true },
+        "action": { "type": "string", "required": true },
+        "targetId": { "type": "string", "required": true },
+        "targetType": { "type": "string", "required": true },
+        "timestamp": { "type": "timestamp", "required": true },
+        "details": { "type": "string", "required": true }
+      }
+    },
+    "notifications": {
+      "description": "In-app notifications for authenticated citizens and staff",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "userId": { "type": "string", "required": true },
+        "reportId": { "type": "string", "required": false },
+        "title": { "type": "string", "required": true },
+        "message": { "type": "string", "required": true },
+        "type": { "type": "string", "required": true },
+        "createdAt": { "type": "timestamp", "required": true },
+        "read": { "type": "boolean", "required": true }
+      }
+    }
+  },
+  "indexes": [
+    {
+      "collectionGroup": "reports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "priority.totalScore", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ]
+}
